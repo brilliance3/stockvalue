@@ -4,3 +4,4 @@
 - [x] 일반 Vite 프로젝트에서 동작하는 default serverless handler 추가.
 - [x] 기존 Web Request 기반 API 로직 유지.
 - [x] 빌드, 린트, API TypeScript 체크 실행.
+- [x] Vercel Node 런타임 호환성을 위해 `Response.json` 의존 제거.

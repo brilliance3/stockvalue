@@ -9,11 +9,14 @@ export function getSearchParam(request: Request, key: string): string | undefine
 }
 
 export function jsonOk(data: unknown, status = 200): Response {
-  return Response.json(data, { status })
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8' },
+  })
 }
 
 export function jsonError(status: number, message: string, details?: unknown): Response {
-  return Response.json({ error: true, message, details }, { status })
+  return jsonOk({ error: true, message, details }, status)
 }
 
 /** Vercel이 정적 분석할 수 있도록 GET/POST 본문에서 직접 호출 */
