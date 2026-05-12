@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stockMaster } from '../src/data/stockMaster'
-import { asVercelFetch, getSearchParam, jsonError, jsonOk } from './_shared'
+import { getSearchParam, jsonError, jsonOk, runWithJsonCatch } from './_shared'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -35,4 +35,6 @@ async function handleDartCorpCode(request: Request): Promise<Response> {
   }
 }
 
-export default asVercelFetch(handleDartCorpCode)
+export async function GET(request: Request): Promise<Response> {
+  return runWithJsonCatch(handleDartCorpCode, request)
+}

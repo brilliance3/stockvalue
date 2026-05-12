@@ -16,16 +16,24 @@ export function jsonError(status: number, message: string, details?: unknown): R
   return Response.json({ error: true, message, details }, { status })
 }
 
-/** 핸들러 예외 시 JSON 500으로 수렴 */
+/** Vercel이 정적 분석할 수 있도록 GET/POST 본문에서 직접 호출 */
+export async function runWithJsonCatch(
+  handler: (request: Request) => Promise<Response>,
+  request: Request,
+): Promise<Response> {
+  try {
+    return await handler(request)
+  } catch (error) {
+    const details = error instanceof Error ? error.message : String(error)
+    return jsonError(500, '서버 오류가 발생했습니다.', details)
+  }
+}
+
+/** @deprecated default { fetch } 리터럴 대신 GET/POST export 사용 */
 export function asVercelFetch(handler: (request: Request) => Promise<Response>) {
   return {
     async fetch(request: Request): Promise<Response> {
-      try {
-        return await handler(request)
-      } catch (error) {
-        const details = error instanceof Error ? error.message : String(error)
-        return jsonError(500, '서버 오류가 발생했습니다.', details)
-      }
+      return runWithJsonCatch(handler, request)
     },
   }
 }

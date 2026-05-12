@@ -8,7 +8,7 @@ import {
   percentToRDecimal,
 } from '../src/utils/requiredReturnR'
 import { calculateSrim } from '../src/utils/srim'
-import { asVercelFetch, jsonError, jsonOk } from './_shared'
+import { jsonError, jsonOk, runWithJsonCatch } from './_shared'
 
 interface ValuationRequestBody {
   stockCode?: string
@@ -32,10 +32,6 @@ async function readJsonBody(request: Request): Promise<ValuationRequestBody | Re
 }
 
 async function handleValuation(request: Request): Promise<Response> {
-  if (request.method.toUpperCase() !== 'POST') {
-    return jsonError(405, 'POST 메서드만 지원합니다.')
-  }
-
   const bodyOrErr = await readJsonBody(request)
   if (bodyOrErr instanceof Response) {
     return bodyOrErr
@@ -113,4 +109,6 @@ async function handleValuation(request: Request): Promise<Response> {
   return jsonOk(result)
 }
 
-export default asVercelFetch(handleValuation)
+export async function POST(request: Request): Promise<Response> {
+  return runWithJsonCatch(handleValuation, request)
+}

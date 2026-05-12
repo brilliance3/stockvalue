@@ -2,7 +2,7 @@
 import { stockMaster } from '../src/data/stockMaster'
 import { normalizeKrxPayload, type RawKrxResponse } from '../src/utils/normalizeKrx'
 import type { KrxPriceResponse } from '../src/types/valuation'
-import { asVercelFetch, getSearchParam, jsonError, jsonOk } from './_shared'
+import { getSearchParam, jsonError, jsonOk, runWithJsonCatch } from './_shared'
 
 function getKrxPathByMarket(market: 'KOSPI' | 'KOSDAQ'): string {
   if (market === 'KOSPI') {
@@ -194,4 +194,6 @@ async function handleKrxPrice(request: Request): Promise<Response> {
   }
 }
 
-export default asVercelFetch(handleKrxPrice)
+export async function GET(request: Request): Promise<Response> {
+  return runWithJsonCatch(handleKrxPrice, request)
+}
