@@ -12,6 +12,7 @@ interface ValuationRequestBody {
   requiredReturn?: number
   useBbbMinusAdjustment?: boolean
   bbbMinusSpread?: number
+  bbbMinusYield?: number
 }
 
 export default function handler(req: ApiRequest, res: ApiResponse): void {
@@ -27,8 +28,9 @@ export default function handler(req: ApiRequest, res: ApiResponse): void {
   const requiredReturn = body.requiredReturn ?? 8
   const useBbbMinusAdjustment = body.useBbbMinusAdjustment ?? false
   const bbbMinusSpread = body.bbbMinusSpread ?? 0
+  const bbbMinusYield = body.bbbMinusYield
   const adjustedRequiredReturn = useBbbMinusAdjustment
-    ? requiredReturn + bbbMinusSpread
+    ? bbbMinusYield ?? requiredReturn + bbbMinusSpread
     : requiredReturn
 
   if (!stockCode) {
@@ -66,7 +68,10 @@ export default function handler(req: ApiRequest, res: ApiResponse): void {
     warnings.push('BPS 직접 공시값이 없어 자본총계/발행주식수로 대체 계산했습니다.')
   }
   if (useBbbMinusAdjustment) {
-    warnings.push(`BBB- 가산금리(${bbbMinusSpread.toFixed(2)}%p)를 할인율에 반영했습니다.`)
+    const appliedSpread = adjustedRequiredReturn - requiredReturn
+    warnings.push(
+      `BBB- 5년 회사채 수익률(${adjustedRequiredReturn.toFixed(2)}%)을 요구수익률로 반영했습니다. (기준대비 +${appliedSpread.toFixed(2)}%p)`,
+    )
   }
 
   const result: ValuationResponse = {
@@ -78,7 +83,7 @@ export default function handler(req: ApiRequest, res: ApiResponse): void {
     bps,
     requiredReturn,
     adjustedRequiredReturn,
-    bbbMinusSpread: useBbbMinusAdjustment ? bbbMinusSpread : 0,
+    bbbMinusSpread: useBbbMinusAdjustment ? adjustedRequiredReturn - requiredReturn : 0,
     scenarios: srim.scenarios,
     warnings,
   }

@@ -34,7 +34,7 @@ function App() {
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [useBbbAdjustment, setUseBbbAdjustment] = useState(false)
-  const [bbbSpreadInput, setBbbSpreadInput] = useState('1.8')
+  const [bbbYieldInput, setBbbYieldInput] = useState('9.8')
 
   const metrics = useMemo(
     () => calculateFinancialMetrics(financialData?.financials ?? []),
@@ -84,7 +84,7 @@ function App() {
           price: pricePayload,
           requiredReturn: 8,
           useBbbMinusAdjustment: useBbbAdjustment,
-          bbbMinusSpread: Number(bbbSpreadInput) || 0,
+          bbbMinusYield: Number(bbbYieldInput) || 8,
         }),
       })
       const valuationPayload = await parseJson<ValuationResponse>(valuationResponse)
@@ -121,19 +121,21 @@ function App() {
               onChange={(event) => setUseBbbAdjustment(event.target.checked)}
               className="h-4 w-4 rounded border-slate-300"
             />
-            BBB- 가산금리 반영
+            BBB- 5년 회사채 수익률을 요구수익률로 사용
           </label>
           <div className="flex items-center gap-2">
             <input
-              value={bbbSpreadInput}
-              onChange={(event) => setBbbSpreadInput(event.target.value)}
+              value={bbbYieldInput}
+              onChange={(event) => setBbbYieldInput(event.target.value)}
               className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
               inputMode="decimal"
               disabled={!useBbbAdjustment}
             />
-            <span className="text-sm text-slate-600">%p</span>
+            <span className="text-sm text-slate-600">%</span>
           </div>
-          <p className="text-xs text-slate-500">기본 할인율 8%에 선택적으로 가산됩니다.</p>
+          <p className="text-xs text-slate-500">
+            금융투자협회 채권시가평가기준수익률의 BBB- 5년 값을 입력하세요.
+          </p>
         </div>
       </section>
 
