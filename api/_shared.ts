@@ -1,4 +1,36 @@
-// 서버리스 API에서 공통 응답/유틸을 제공하는 헬퍼
+// 서버리스 API 공통: Vercel Web 표준(Request/Response) + 레거시 타입(로컬 도구용)
+
+/** Vercel Functions(Web)에서 쿼리스트링 읽기 */
+export function getSearchParam(request: Request, key: string): string | undefined {
+  const url = new URL(request.url)
+  const raw = url.searchParams.get(key)
+  if (raw === null || raw === '') return undefined
+  return raw
+}
+
+export function jsonOk(data: unknown, status = 200): Response {
+  return Response.json(data, { status })
+}
+
+export function jsonError(status: number, message: string, details?: unknown): Response {
+  return Response.json({ error: true, message, details }, { status })
+}
+
+/** 핸들러 예외 시 JSON 500으로 수렴 */
+export function asVercelFetch(handler: (request: Request) => Promise<Response>) {
+  return {
+    async fetch(request: Request): Promise<Response> {
+      try {
+        return await handler(request)
+      } catch (error) {
+        const details = error instanceof Error ? error.message : String(error)
+        return jsonError(500, '서버 오류가 발생했습니다.', details)
+      }
+    },
+  }
+}
+
+/** @deprecated 로컬 타입 호환용 — 신규 코드는 Request + getSearchParam 사용 */
 export interface ApiRequest {
   query?: Record<string, string | string[] | undefined>
   body?: unknown
@@ -10,10 +42,7 @@ export interface ApiResponse {
   json: (payload: unknown) => void
 }
 
-export function getQueryParam(
-  req: ApiRequest,
-  key: string,
-): string | undefined {
+export function getQueryParam(req: ApiRequest, key: string): string | undefined {
   const value = req.query?.[key]
   if (Array.isArray(value)) return value[0]
   return value

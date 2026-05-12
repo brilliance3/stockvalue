@@ -2,8 +2,7 @@
 import { stockMaster } from '../src/data/stockMaster'
 import { normalizeDartFinancials, type DartItem } from '../src/utils/normalizeDart'
 import type { DartFinancialResponse } from '../src/types/financial'
-import { getQueryParam, sendError, type ApiRequest, type ApiResponse } from './_shared'
-import { withJsonHandler } from './withJsonHandler'
+import { asVercelFetch, getSearchParam, jsonError, jsonOk } from './_shared'
 
 type DartFsType = 'CFS' | 'OFS'
 
@@ -38,34 +37,27 @@ async function fetchDartYear(
   return payload.list ?? []
 }
 
-async function dartFinancialsHandler(
-  req: ApiRequest,
-  res: ApiResponse,
-): Promise<void> {
+async function handleDartFinancials(request: Request): Promise<Response> {
   const apiKey = process.env.OPEN_DART_API_KEY
   if (!apiKey) {
-    sendError(
-      res,
+    return jsonError(
       400,
       'OPEN_DART_API_KEY가 설정되지 않았습니다.',
       '환경변수에 OPEN_DART_API_KEY를 추가해 주세요.',
     )
-    return
   }
 
-  const stockCode = getQueryParam(req, 'stockCode')
+  const stockCode = getSearchParam(request, 'stockCode')
   if (!stockCode) {
-    sendError(res, 400, 'stockCode 파라미터가 필요합니다.')
-    return
+    return jsonError(400, 'stockCode 파라미터가 필요합니다.')
   }
 
   const corpCode =
-    getQueryParam(req, 'corpCode') ??
+    getSearchParam(request, 'corpCode') ??
     stockMaster.find((item) => item.code === stockCode)?.corpCode
 
   if (!corpCode) {
-    sendError(res, 404, 'corpCode를 찾지 못했습니다.')
-    return
+    return jsonError(404, 'corpCode를 찾지 못했습니다.')
   }
 
   const currentYear = new Date().getFullYear() - 1
@@ -73,7 +65,7 @@ async function dartFinancialsHandler(
 
   try {
     let source: DartFsType = 'CFS'
-    let items: DartItem[] = []
+    const items: DartItem[] = []
 
     for (const year of years) {
       const annual = await fetchDartYear(apiKey, corpCode, year, 'CFS')
@@ -104,10 +96,10 @@ async function dartFinancialsHandler(
       message: financials.length === 0 ? '재무 데이터를 찾지 못했습니다.' : undefined,
     }
 
-    res.status(200).json(response)
+    return jsonOk(response)
   } catch (error) {
-    sendError(res, 500, 'OpenDART 조회 중 오류가 발생했습니다.', String(error))
+    return jsonError(500, 'OpenDART 조회 중 오류가 발생했습니다.', String(error))
   }
 }
 
-export default withJsonHandler(dartFinancialsHandler)
+export default asVercelFetch(handleDartFinancials)

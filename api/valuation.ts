@@ -8,8 +8,7 @@ import {
   percentToRDecimal,
 } from '../src/utils/requiredReturnR'
 import { calculateSrim } from '../src/utils/srim'
-import { sendError, type ApiRequest, type ApiResponse } from './_shared'
-import { withJsonHandler } from './withJsonHandler'
+import { asVercelFetch, jsonError, jsonOk } from './_shared'
 
 interface ValuationRequestBody {
   stockCode?: string
@@ -23,30 +22,26 @@ interface ValuationRequestBody {
   bbbYieldSource?: BbbYieldSource
 }
 
-function readJsonBody(req: ApiRequest): ValuationRequestBody {
+async function readJsonBody(request: Request): Promise<ValuationRequestBody | Response> {
   try {
-    return (req.body ?? {}) as ValuationRequestBody
+    const body = (await request.json()) as ValuationRequestBody
+    return body ?? {}
   } catch {
-    throw new Error('JSON_BODY_PARSE')
+    return jsonError(400, '요청 본문(JSON)을 해석할 수 없습니다.')
   }
 }
 
-function valuationHandler(req: ApiRequest, res: ApiResponse): void {
-  if (req.method && req.method.toUpperCase() !== 'POST') {
-    sendError(res, 405, 'POST 메서드만 지원합니다.')
-    return
+async function handleValuation(request: Request): Promise<Response> {
+  if (request.method.toUpperCase() !== 'POST') {
+    return jsonError(405, 'POST 메서드만 지원합니다.')
   }
 
-  let body: ValuationRequestBody
-  try {
-    body = readJsonBody(req)
-  } catch (error) {
-    if (error instanceof Error && error.message === 'JSON_BODY_PARSE') {
-      sendError(res, 400, '요청 본문(JSON)을 해석할 수 없습니다.')
-      return
-    }
-    throw error
+  const bodyOrErr = await readJsonBody(request)
+  if (bodyOrErr instanceof Response) {
+    return bodyOrErr
   }
+  const body = bodyOrErr
+
   const stockCode = body.stockCode
   const financials = body.financials ?? []
   const price = body.price
@@ -65,8 +60,7 @@ function valuationHandler(req: ApiRequest, res: ApiResponse): void {
   const rDecimal = percentToRDecimal(adjustedRequiredReturn)
 
   if (!stockCode) {
-    sendError(res, 400, 'stockCode가 필요합니다.')
-    return
+    return jsonError(400, 'stockCode가 필요합니다.')
   }
 
   const metrics = calculateFinancialMetrics(financials)
@@ -116,7 +110,7 @@ function valuationHandler(req: ApiRequest, res: ApiResponse): void {
     warnings,
   }
 
-  res.status(200).json(result)
+  return jsonOk(result)
 }
 
-export default withJsonHandler(valuationHandler)
+export default asVercelFetch(handleValuation)

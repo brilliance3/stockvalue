@@ -2,8 +2,7 @@
 import { stockMaster } from '../src/data/stockMaster'
 import { normalizeKrxPayload, type RawKrxResponse } from '../src/utils/normalizeKrx'
 import type { KrxPriceResponse } from '../src/types/valuation'
-import { getQueryParam, sendError, type ApiRequest, type ApiResponse } from './_shared'
-import { withJsonHandler } from './withJsonHandler'
+import { asVercelFetch, getSearchParam, jsonError, jsonOk } from './_shared'
 
 function getKrxPathByMarket(market: 'KOSPI' | 'KOSDAQ'): string {
   if (market === 'KOSPI') {
@@ -96,64 +95,57 @@ async function fetchYahooFallback(
   }
 }
 
-async function krxPriceHandler(
-  req: ApiRequest,
-  res: ApiResponse,
-): Promise<void> {
-  const stockCode = getQueryParam(req, 'stockCode')
+async function handleKrxPrice(request: Request): Promise<Response> {
+  const stockCode = getSearchParam(request, 'stockCode')
   if (!stockCode) {
-    sendError(res, 400, 'stockCode 파라미터가 필요합니다.')
-    return
+    return jsonError(400, 'stockCode 파라미터가 필요합니다.')
   }
 
   const selected = stockMaster.find((item) => item.code === stockCode)
   if (!selected) {
-    sendError(res, 404, '지원하지 않는 종목코드입니다.')
-    return
+    return jsonError(404, '지원하지 않는 종목코드입니다.')
   }
 
   const baseUrl = process.env.KRX_API_BASE_URL
   const apiKey = process.env.KRX_API_KEY
 
   if (!baseUrl || !apiKey) {
-    const response = buildUnavailableResponse(
-      stockCode,
-      selected.market,
-      'KRX_API_BASE_URL 또는 KRX_API_KEY가 없어 시세를 조회하지 못했습니다. 환경변수를 설정해 주세요.',
+    return jsonOk(
+      buildUnavailableResponse(
+        stockCode,
+        selected.market,
+        'KRX_API_BASE_URL 또는 KRX_API_KEY가 없어 시세를 조회하지 못했습니다. 환경변수를 설정해 주세요.',
+      ),
     )
-    res.status(200).json(response)
-    return
   }
 
   if (baseUrl.includes('openapi.krx.co.kr')) {
-    const response = buildUnavailableResponse(
-      stockCode,
-      selected.market,
-      'KRX_API_BASE_URL이 포털 URL(openapi.krx.co.kr)로 설정되어 있습니다. 실제 데이터 API 베이스 URL로 변경해 주세요. 예: https://data-dbg.krx.co.kr/svc/apis',
+    return jsonOk(
+      buildUnavailableResponse(
+        stockCode,
+        selected.market,
+        'KRX_API_BASE_URL이 포털 URL(openapi.krx.co.kr)로 설정되어 있습니다. 실제 데이터 API 베이스 URL로 변경해 주세요. 예: https://data-dbg.krx.co.kr/svc/apis',
+      ),
     )
-    res.status(200).json(response)
-    return
   }
 
-  const basDd = getQueryParam(req, 'basDd') ?? toYyyyMmDd(new Date())
+  const basDd = getSearchParam(request, 'basDd') ?? toYyyyMmDd(new Date())
   const endpoint = `${baseUrl}${getKrxPathByMarket(selected.market)}?basDd=${basDd}`
-  const tryFallbackAndRespond = async (reason: string) => {
-    let fallbackError: string | null = null
+
+  const tryFallbackAndRespond = async (reason: string): Promise<Response> => {
+    let fallbackError: string
     try {
       const fallback = await fetchYahooFallback(stockCode, selected.market)
       if (fallback) {
         fallback.message = `${reason} / ${fallback.message}`
-        res.status(200).json(fallback)
-        return
+        return jsonOk(fallback)
       }
       fallbackError = 'Yahoo Finance에서 유효한 시세 데이터를 받지 못했습니다.'
     } catch (error) {
       fallbackError = `Yahoo Finance fallback 실패: ${String(error)}`
     }
-    const combinedReason = fallbackError ? `${reason} / ${fallbackError}` : reason
-    res
-      .status(200)
-      .json(buildUnavailableResponse(stockCode, selected.market, combinedReason))
+    const combinedReason = `${reason} / ${fallbackError}`
+    return jsonOk(buildUnavailableResponse(stockCode, selected.market, combinedReason))
   }
 
   try {
@@ -164,29 +156,26 @@ async function krxPriceHandler(
     })
 
     if (!response.ok) {
-      await tryFallbackAndRespond(
+      return await tryFallbackAndRespond(
         `KRX 시세 조회 실패(${response.status}). 요청 URL: ${endpoint}`,
       )
-      return
     }
 
     const payload = (await response.json()) as unknown
     const payloadObj = payload as Record<string, unknown>
     if (payloadObj?.respCode && String(payloadObj.respCode) !== '0') {
-      await tryFallbackAndRespond(
+      return await tryFallbackAndRespond(
         `KRX API 응답 오류(${String(payloadObj.respCode)}): ${String(payloadObj.respMsg ?? 'Unknown')}`,
       )
-      return
     }
 
     const rows = getKrxRows(payload)
     const row = rows.find((item) => matchesStock(item, stockCode))
 
     if (!row) {
-      await tryFallbackAndRespond(
+      return await tryFallbackAndRespond(
         `KRX 응답에서 종목(${stockCode}) 데이터를 찾지 못했습니다. 요청 URL: ${endpoint}`,
       )
-      return
     }
 
     const normalized = normalizeKrxPayload(row)
@@ -199,10 +188,10 @@ async function krxPriceHandler(
       sharesOutstanding: normalized.sharesOutstanding,
       date: normalized.date,
     }
-    res.status(200).json(result)
+    return jsonOk(result)
   } catch (error) {
-    await tryFallbackAndRespond(`KRX 연동 중 네트워크 오류가 발생했습니다. ${String(error)}`)
+    return await tryFallbackAndRespond(`KRX 연동 중 네트워크 오류가 발생했습니다. ${String(error)}`)
   }
 }
 
-export default withJsonHandler(krxPriceHandler)
+export default asVercelFetch(handleKrxPrice)

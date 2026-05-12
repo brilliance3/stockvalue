@@ -3,8 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stockMaster } from '../src/data/stockMaster'
-import { getQueryParam, sendError, type ApiRequest, type ApiResponse } from './_shared'
-import { withJsonHandler } from './withJsonHandler'
+import { asVercelFetch, getSearchParam, jsonError, jsonOk } from './_shared'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -14,15 +13,11 @@ async function loadCorpCodeMap(): Promise<Record<string, string>> {
   return JSON.parse(raw) as Record<string, string>
 }
 
-async function dartCorpCodeHandler(
-  req: ApiRequest,
-  res: ApiResponse,
-): Promise<void> {
+async function handleDartCorpCode(request: Request): Promise<Response> {
   try {
-    const stockCode = getQueryParam(req, 'stockCode')
+    const stockCode = getSearchParam(request, 'stockCode')
     if (!stockCode) {
-      sendError(res, 400, 'stockCode 파라미터가 필요합니다.')
-      return
+      return jsonError(400, 'stockCode 파라미터가 필요합니다.')
     }
 
     const map = await loadCorpCodeMap()
@@ -31,14 +26,13 @@ async function dartCorpCodeHandler(
     const corpCode = byJson ?? byMaster
 
     if (!corpCode) {
-      sendError(res, 404, 'corpCode를 찾을 수 없습니다.')
-      return
+      return jsonError(404, 'corpCode를 찾을 수 없습니다.')
     }
 
-    res.status(200).json({ stockCode, corpCode })
+    return jsonOk({ stockCode, corpCode })
   } catch (error) {
-    sendError(res, 500, 'corpCode 조회에 실패했습니다.', String(error))
+    return jsonError(500, 'corpCode 조회에 실패했습니다.', String(error))
   }
 }
 
-export default withJsonHandler(dartCorpCodeHandler)
+export default asVercelFetch(handleDartCorpCode)
