@@ -8,7 +8,14 @@ import {
   percentToRDecimal,
 } from '../src/utils/requiredReturnR'
 import { calculateSrim } from '../src/utils/srim'
-import { jsonError, jsonOk, runWithJsonCatch } from './_shared'
+import {
+  jsonError,
+  jsonOk,
+  runVercelFunction,
+  runWithJsonCatch,
+  type ApiRequest,
+  type ApiResponse,
+} from './_shared'
 
 interface ValuationRequestBody {
   stockCode?: string
@@ -111,4 +118,8 @@ async function handleValuation(request: Request): Promise<Response> {
 
 export async function POST(request: Request): Promise<Response> {
   return runWithJsonCatch(handleValuation, request)
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
+  await runVercelFunction(req, res, ['POST'], handleValuation)
 }

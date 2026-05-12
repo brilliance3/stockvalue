@@ -3,7 +3,15 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stockMaster } from '../src/data/stockMaster'
-import { getSearchParam, jsonError, jsonOk, runWithJsonCatch } from './_shared'
+import {
+  getSearchParam,
+  jsonError,
+  jsonOk,
+  runVercelFunction,
+  runWithJsonCatch,
+  type ApiRequest,
+  type ApiResponse,
+} from './_shared'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -37,4 +45,8 @@ async function handleDartCorpCode(request: Request): Promise<Response> {
 
 export async function GET(request: Request): Promise<Response> {
   return runWithJsonCatch(handleDartCorpCode, request)
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
+  await runVercelFunction(req, res, ['GET'], handleDartCorpCode)
 }

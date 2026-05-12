@@ -2,7 +2,15 @@
 import { stockMaster } from '../src/data/stockMaster'
 import { normalizeDartFinancials, type DartItem } from '../src/utils/normalizeDart'
 import type { DartFinancialResponse } from '../src/types/financial'
-import { getSearchParam, jsonError, jsonOk, runWithJsonCatch } from './_shared'
+import {
+  getSearchParam,
+  jsonError,
+  jsonOk,
+  runVercelFunction,
+  runWithJsonCatch,
+  type ApiRequest,
+  type ApiResponse,
+} from './_shared'
 
 type DartFsType = 'CFS' | 'OFS'
 
@@ -104,4 +112,8 @@ async function handleDartFinancials(request: Request): Promise<Response> {
 
 export async function GET(request: Request): Promise<Response> {
   return runWithJsonCatch(handleDartFinancials, request)
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
+  await runVercelFunction(req, res, ['GET'], handleDartFinancials)
 }

@@ -1,7 +1,15 @@
 // 종목명/코드 검색 결과를 반환하는 서버리스 엔드포인트
 import { stockMaster } from '../src/data/stockMaster'
 import type { SearchStockResponse } from '../src/types/stock'
-import { getSearchParam, jsonError, jsonOk, runWithJsonCatch } from './_shared'
+import {
+  getSearchParam,
+  jsonError,
+  jsonOk,
+  runVercelFunction,
+  runWithJsonCatch,
+  type ApiRequest,
+  type ApiResponse,
+} from './_shared'
 
 async function handleSearch(request: Request): Promise<Response> {
   const q = (getSearchParam(request, 'q') ?? '').trim()
@@ -20,4 +28,8 @@ async function handleSearch(request: Request): Promise<Response> {
 
 export async function GET(request: Request): Promise<Response> {
   return runWithJsonCatch(handleSearch, request)
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
+  await runVercelFunction(req, res, ['GET'], handleSearch)
 }
