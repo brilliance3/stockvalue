@@ -15,12 +15,15 @@ interface FinancialChartProps {
   financials: FinancialRow[]
 }
 
+/** h-72와 동일(288px). ResponsiveContainer가 % 높이로 -1 측정되는 것을 피함 */
+const CHART_HEIGHT_PX = 288
+
 export function FinancialChart({ financials }: FinancialChartProps) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="mb-4 text-lg font-semibold text-slate-900">재무 추이 차트</h2>
-      <div className="h-72">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="min-h-0 w-full min-w-0" style={{ height: CHART_HEIGHT_PX }}>
+        <ResponsiveContainer width="100%" height={CHART_HEIGHT_PX} minWidth={0}>
           <LineChart data={financials}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="year" />

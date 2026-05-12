@@ -1,4 +1,8 @@
 // 밸류에이션 계산 결과와 시나리오 타입을 정의하는 파일
+
+/** BBB- 5년 요구수익률 입력 시 사용자가 값을 가져온 출처(안내·경고 문구용) */
+export type BbbYieldSource = 'kofia' | 'kap' | 'estimate'
+
 export interface KrxPriceResponse {
   stockCode: string
   market: 'KOSPI' | 'KOSDAQ'

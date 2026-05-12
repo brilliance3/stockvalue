@@ -1,7 +1,12 @@
 // 재무데이터와 시세를 기반으로 S-RIM 가치를 계산하는 서버리스 엔드포인트
 import type { FinancialRow } from '../src/types/financial'
-import type { KrxPriceResponse, ValuationResponse } from '../src/types/valuation'
+import type { BbbYieldSource, KrxPriceResponse, ValuationResponse } from '../src/types/valuation'
 import { calculateFinancialMetrics } from '../src/utils/financialMetrics'
+import {
+  methodologyWarnings,
+  normalizeYieldPercentInput,
+  percentToRDecimal,
+} from '../src/utils/requiredReturnR'
 import { calculateSrim } from '../src/utils/srim'
 import { sendError, type ApiRequest, type ApiResponse } from './_shared'
 
@@ -13,6 +18,8 @@ interface ValuationRequestBody {
   useBbbMinusAdjustment?: boolean
   bbbMinusSpread?: number
   bbbMinusYield?: number
+  /** 금투협(kofiabond) 1순위·KAP 보조·추정 대체 */
+  bbbYieldSource?: BbbYieldSource
 }
 
 export default function handler(req: ApiRequest, res: ApiResponse): void {
@@ -28,10 +35,16 @@ export default function handler(req: ApiRequest, res: ApiResponse): void {
   const requiredReturn = body.requiredReturn ?? 8
   const useBbbMinusAdjustment = body.useBbbMinusAdjustment ?? false
   const bbbMinusSpread = body.bbbMinusSpread ?? 0
-  const bbbMinusYield = body.bbbMinusYield
+  const rawBbbYield = body.bbbMinusYield
+  const bbbYieldSource: BbbYieldSource = body.bbbYieldSource ?? 'kofia'
+  const normalizedBbbYield =
+    rawBbbYield !== undefined && rawBbbYield !== null
+      ? normalizeYieldPercentInput(Number(rawBbbYield))
+      : null
   const adjustedRequiredReturn = useBbbMinusAdjustment
-    ? bbbMinusYield ?? requiredReturn + bbbMinusSpread
+    ? normalizedBbbYield ?? requiredReturn + bbbMinusSpread
     : requiredReturn
+  const rDecimal = percentToRDecimal(adjustedRequiredReturn)
 
   if (!stockCode) {
     sendError(res, 400, 'stockCode가 필요합니다.')
@@ -68,10 +81,7 @@ export default function handler(req: ApiRequest, res: ApiResponse): void {
     warnings.push('BPS 직접 공시값이 없어 자본총계/발행주식수로 대체 계산했습니다.')
   }
   if (useBbbMinusAdjustment) {
-    const appliedSpread = adjustedRequiredReturn - requiredReturn
-    warnings.push(
-      `BBB- 5년 회사채 수익률(${adjustedRequiredReturn.toFixed(2)}%)을 요구수익률로 반영했습니다. (기준대비 +${appliedSpread.toFixed(2)}%p)`,
-    )
+    warnings.push(...methodologyWarnings(bbbYieldSource, adjustedRequiredReturn, rDecimal))
   }
 
   const result: ValuationResponse = {

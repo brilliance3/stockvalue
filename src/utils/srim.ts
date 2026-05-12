@@ -14,13 +14,20 @@ export interface SrimResult {
   scenarios: ValuationScenario[]
 }
 
+/**
+ * S-RIM 적정가 = BPS × (ROE / r). ROE는 %(예: 10=10%), r은 요구수익률 %(예: 8=8%)을 받아
+ * 내부에서는 소수 roeDec, rDec로 변환해 동일 비율로 계산한다.
+ */
 function calcFairPrice(
   bps: number | null,
-  roe: number | null,
-  discountRate: number,
+  roePercent: number | null,
+  requiredReturnPercent: number,
 ): number | null {
-  if (bps === null || roe === null) return null
-  return bps * (roe / discountRate)
+  if (bps === null || roePercent === null) return null
+  const roeDec = roePercent / 100
+  const rDec = requiredReturnPercent / 100
+  if (rDec <= 0) return null
+  return bps * (roeDec / rDec)
 }
 
 function calcUpside(

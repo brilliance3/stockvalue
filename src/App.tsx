@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ErrorState } from './components/ErrorState'
 import { FinancialChart } from './components/FinancialChart'
 import { FinancialTable } from './components/FinancialTable'
@@ -11,9 +11,14 @@ import { StockSearch } from './components/StockSearch'
 import { ValuationCard } from './components/ValuationCard'
 import type { DartFinancialResponse } from './types/financial'
 import type { StockMasterItem } from './types/stock'
-import type { KrxPriceResponse, ValuationResponse } from './types/valuation'
+import type { BbbYieldSource, KrxPriceResponse, ValuationResponse } from './types/valuation'
 import { calculateFinancialMetrics } from './utils/financialMetrics'
 import { formatCurrency, formatPercent } from './utils/format'
+import {
+  R_MATURITY_WARNING,
+  R_SOURCE_KAP_GUIDE,
+  R_SOURCE_KOFIA_GUIDE,
+} from './utils/requiredReturnR'
 
 async function parseJson<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as T & { message?: string }
@@ -34,7 +39,8 @@ function App() {
   const [searching, setSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [useBbbAdjustment, setUseBbbAdjustment] = useState(false)
-  const [bbbYieldInput, setBbbYieldInput] = useState('9.8')
+  const [bbbYieldSource, setBbbYieldSource] = useState<BbbYieldSource>('kofia')
+  const [bbbYieldInput, setBbbYieldInput] = useState('8.5')
 
   const metrics = useMemo(
     () => calculateFinancialMetrics(financialData?.financials ?? []),
@@ -74,21 +80,6 @@ function App() {
       const pricePayload = await parseJson<KrxPriceResponse>(priceResponse)
       setFinancialData(financialPayload)
       setPriceData(pricePayload)
-
-      const valuationResponse = await fetch('/api/valuation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          stockCode: stock.code,
-          financials: financialPayload.financials,
-          price: pricePayload,
-          requiredReturn: 8,
-          useBbbMinusAdjustment: useBbbAdjustment,
-          bbbMinusYield: Number(bbbYieldInput) || 8,
-        }),
-      })
-      const valuationPayload = await parseJson<ValuationResponse>(valuationResponse)
-      setValuation(valuationPayload)
     } catch (caughtError) {
       setError(
         caughtError instanceof Error ? caughtError.message : '데이터 조회 중 오류가 발생했습니다.',
@@ -97,6 +88,52 @@ function App() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!selectedStock || !financialData || !priceData) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const valuationResponse = await fetch('/api/valuation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stockCode: selectedStock.code,
+            financials: financialData.financials,
+            price: priceData,
+            requiredReturn: 8,
+            useBbbMinusAdjustment: useBbbAdjustment,
+            bbbMinusYield: Number(bbbYieldInput) || 8,
+            bbbYieldSource,
+          }),
+        })
+        const valuationPayload = await parseJson<ValuationResponse>(valuationResponse)
+        if (!cancelled) {
+          setValuation(valuationPayload)
+          setError(null)
+        }
+      } catch (caughtError) {
+        if (!cancelled) {
+          setValuation(null)
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : '밸류에이션 계산 중 오류가 발생했습니다.',
+          )
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    selectedStock,
+    financialData,
+    priceData,
+    useBbbAdjustment,
+    bbbYieldSource,
+    bbbYieldInput,
+  ])
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-5 p-4 md:p-8">
@@ -112,8 +149,8 @@ function App() {
       />
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">할인율 옵션</h2>
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <h2 className="mb-3 text-base font-semibold text-slate-900">요구수익률 r (원칙. BBB- 등급 5년 만기 무보증 회사채)</h2>
+        <div className="flex flex-col gap-3">
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
@@ -121,9 +158,44 @@ function App() {
               onChange={(event) => setUseBbbAdjustment(event.target.checked)}
               className="h-4 w-4 rounded border-slate-300"
             />
-            BBB- 5년 회사채 수익률을 요구수익률로 사용
+            위 원칙에 따른 시장 수익률(%)을 요구수익률 r로 사용 (해제 시 내부 기본 8% 가정)
           </label>
-          <div className="flex items-center gap-2">
+          <fieldset
+            disabled={!useBbbAdjustment}
+            className="flex flex-col gap-2 border-0 p-0 text-sm text-slate-700"
+          >
+            <legend className="sr-only">수익률 출처</legend>
+            <span className="font-medium text-slate-800">조회·입력 출처</span>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="bbb-src"
+                checked={bbbYieldSource === 'kofia'}
+                onChange={() => setBbbYieldSource('kofia')}
+              />
+              금융투자협회 채권정보센터 (1순위)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="bbb-src"
+                checked={bbbYieldSource === 'kap'}
+                onChange={() => setBbbYieldSource('kap')}
+              />
+              한국자산평가(KAP) 채권금리 기준수익률 (보조)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="bbb-src"
+                checked={bbbYieldSource === 'estimate'}
+                onChange={() => setBbbYieldSource('estimate')}
+              />
+              공식 확인 어려움·추정·대체 (8~9% 대역 권장, 시장 급변 시 최신 검색 우선)
+            </label>
+          </fieldset>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate-700">확인한 수익률</span>
             <input
               value={bbbYieldInput}
               onChange={(event) => setBbbYieldInput(event.target.value)}
@@ -131,11 +203,13 @@ function App() {
               inputMode="decimal"
               disabled={!useBbbAdjustment}
             />
-            <span className="text-sm text-slate-600">%</span>
+            <span className="text-sm text-slate-600">% (표가 %면 그대로 입력. 계산 시 r=값÷100)</span>
           </div>
-          <p className="text-xs text-slate-500">
-            금융투자협회 채권시가평가기준수익률의 BBB- 5년 값을 입력하세요.
-          </p>
+          <ul className="list-inside list-disc space-y-1 text-xs text-slate-600">
+            <li>{R_SOURCE_KOFIA_GUIDE}</li>
+            <li>{R_SOURCE_KAP_GUIDE}</li>
+            <li className="text-amber-900">{R_MATURITY_WARNING}</li>
+          </ul>
         </div>
       </section>
 
@@ -160,7 +234,7 @@ function App() {
             <MetricCard title="ROE" value={formatPercent(metrics.roe)} />
             <MetricCard title="현재가" value={formatCurrency(priceData?.closePrice ?? null)} />
             <MetricCard
-              title="적용 할인율"
+              title="적용 요구수익률 r"
               value={`${valuation.adjustedRequiredReturn.toFixed(2)}%`}
             />
             <MetricCard

@@ -30,6 +30,10 @@ export function ScenarioTable({ scenarios }: ScenarioTableProps) {
           ))}
         </tbody>
       </table>
+      <p className="mt-3 text-xs text-slate-500">
+        낙관·비관 열의 할인율은 시나리오용 가정(%)이며, 채권 만기와 무관합니다. 요구수익률 r은 5년 만기·무보증·BBB- 회사채 수익률로 별도
+        확정하는 것을 원칙으로 합니다.
+      </p>
     </section>
   )
 }
