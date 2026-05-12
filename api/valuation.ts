@@ -9,6 +9,7 @@ import {
 } from '../src/utils/requiredReturnR'
 import { calculateSrim } from '../src/utils/srim'
 import { sendError, type ApiRequest, type ApiResponse } from './_shared'
+import { withJsonHandler } from './withJsonHandler'
 
 interface ValuationRequestBody {
   stockCode?: string
@@ -22,13 +23,30 @@ interface ValuationRequestBody {
   bbbYieldSource?: BbbYieldSource
 }
 
-export default function handler(req: ApiRequest, res: ApiResponse): void {
+function readJsonBody(req: ApiRequest): ValuationRequestBody {
+  try {
+    return (req.body ?? {}) as ValuationRequestBody
+  } catch {
+    throw new Error('JSON_BODY_PARSE')
+  }
+}
+
+function valuationHandler(req: ApiRequest, res: ApiResponse): void {
   if (req.method && req.method.toUpperCase() !== 'POST') {
     sendError(res, 405, 'POST 메서드만 지원합니다.')
     return
   }
 
-  const body = (req.body ?? {}) as ValuationRequestBody
+  let body: ValuationRequestBody
+  try {
+    body = readJsonBody(req)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'JSON_BODY_PARSE') {
+      sendError(res, 400, '요청 본문(JSON)을 해석할 수 없습니다.')
+      return
+    }
+    throw error
+  }
   const stockCode = body.stockCode
   const financials = body.financials ?? []
   const price = body.price
@@ -100,3 +118,5 @@ export default function handler(req: ApiRequest, res: ApiResponse): void {
 
   res.status(200).json(result)
 }
+
+export default withJsonHandler(valuationHandler)

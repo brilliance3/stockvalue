@@ -3,6 +3,7 @@ import { stockMaster } from '../src/data/stockMaster'
 import { normalizeDartFinancials, type DartItem } from '../src/utils/normalizeDart'
 import type { DartFinancialResponse } from '../src/types/financial'
 import { getQueryParam, sendError, type ApiRequest, type ApiResponse } from './_shared'
+import { withJsonHandler } from './withJsonHandler'
 
 type DartFsType = 'CFS' | 'OFS'
 
@@ -37,7 +38,7 @@ async function fetchDartYear(
   return payload.list ?? []
 }
 
-export default async function handler(
+async function dartFinancialsHandler(
   req: ApiRequest,
   res: ApiResponse,
 ): Promise<void> {
@@ -108,3 +109,5 @@ export default async function handler(
     sendError(res, 500, 'OpenDART 조회 중 오류가 발생했습니다.', String(error))
   }
 }
+
+export default withJsonHandler(dartFinancialsHandler)

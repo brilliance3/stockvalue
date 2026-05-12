@@ -2,8 +2,9 @@
 import { stockMaster } from '../src/data/stockMaster'
 import type { SearchStockResponse } from '../src/types/stock'
 import { getQueryParam, sendError, type ApiRequest, type ApiResponse } from './_shared'
+import { withJsonHandler } from './withJsonHandler'
 
-export default function handler(req: ApiRequest, res: ApiResponse): void {
+function searchStockHandler(req: ApiRequest, res: ApiResponse): void {
   const q = getQueryParam(req, 'q')?.trim() ?? ''
   if (!q) {
     sendError(res, 400, '검색어(q)를 입력해 주세요.')
@@ -18,3 +19,5 @@ export default function handler(req: ApiRequest, res: ApiResponse): void {
   const response: SearchStockResponse = { items }
   res.status(200).json(response)
 }
+
+export default withJsonHandler(searchStockHandler)

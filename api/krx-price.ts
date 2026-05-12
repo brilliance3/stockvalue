@@ -3,6 +3,7 @@ import { stockMaster } from '../src/data/stockMaster'
 import { normalizeKrxPayload, type RawKrxResponse } from '../src/utils/normalizeKrx'
 import type { KrxPriceResponse } from '../src/types/valuation'
 import { getQueryParam, sendError, type ApiRequest, type ApiResponse } from './_shared'
+import { withJsonHandler } from './withJsonHandler'
 
 function getKrxPathByMarket(market: 'KOSPI' | 'KOSDAQ'): string {
   if (market === 'KOSPI') {
@@ -95,7 +96,7 @@ async function fetchYahooFallback(
   }
 }
 
-export default async function handler(
+async function krxPriceHandler(
   req: ApiRequest,
   res: ApiResponse,
 ): Promise<void> {
@@ -203,3 +204,5 @@ export default async function handler(
     await tryFallbackAndRespond(`KRX 연동 중 네트워크 오류가 발생했습니다. ${String(error)}`)
   }
 }
+
+export default withJsonHandler(krxPriceHandler)

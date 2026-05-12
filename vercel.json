@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/dart-corp-code.ts": {
+      "includeFiles": "public/corpCodeMap.json"
+    }
+  }
+}

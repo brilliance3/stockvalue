@@ -14,19 +14,12 @@ import type { StockMasterItem } from './types/stock'
 import type { BbbYieldSource, KrxPriceResponse, ValuationResponse } from './types/valuation'
 import { calculateFinancialMetrics } from './utils/financialMetrics'
 import { formatCurrency, formatPercent } from './utils/format'
+import { parseApiJson } from './utils/parseApiJson'
 import {
   R_MATURITY_WARNING,
   R_SOURCE_KAP_GUIDE,
   R_SOURCE_KOFIA_GUIDE,
 } from './utils/requiredReturnR'
-
-async function parseJson<T>(response: Response): Promise<T> {
-  const payload = (await response.json()) as T & { message?: string }
-  if (!response.ok) {
-    throw new Error(payload.message ?? '요청에 실패했습니다.')
-  }
-  return payload
-}
 
 function App() {
   const [keyword, setKeyword] = useState('')
@@ -53,7 +46,7 @@ function App() {
     setError(null)
     try {
       const response = await fetch(`/api/search-stock?q=${encodeURIComponent(keyword)}`)
-      const payload = await parseJson<{ items: StockMasterItem[] }>(response)
+      const payload = await parseApiJson<{ items: StockMasterItem[] }>(response)
       setSearchItems(payload.items)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : '검색 중 오류가 발생했습니다.')
@@ -76,8 +69,8 @@ function App() {
         fetch(`/api/krx-price?stockCode=${stock.code}`),
       ])
 
-      const financialPayload = await parseJson<DartFinancialResponse>(financialResponse)
-      const pricePayload = await parseJson<KrxPriceResponse>(priceResponse)
+      const financialPayload = await parseApiJson<DartFinancialResponse>(financialResponse)
+      const pricePayload = await parseApiJson<KrxPriceResponse>(priceResponse)
       setFinancialData(financialPayload)
       setPriceData(pricePayload)
     } catch (caughtError) {
@@ -107,7 +100,7 @@ function App() {
             bbbYieldSource,
           }),
         })
-        const valuationPayload = await parseJson<ValuationResponse>(valuationResponse)
+        const valuationPayload = await parseApiJson<ValuationResponse>(valuationResponse)
         if (!cancelled) {
           setValuation(valuationPayload)
           setError(null)

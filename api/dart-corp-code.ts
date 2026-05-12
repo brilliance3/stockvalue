@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stockMaster } from '../src/data/stockMaster'
 import { getQueryParam, sendError, type ApiRequest, type ApiResponse } from './_shared'
+import { withJsonHandler } from './withJsonHandler'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -13,7 +14,7 @@ async function loadCorpCodeMap(): Promise<Record<string, string>> {
   return JSON.parse(raw) as Record<string, string>
 }
 
-export default async function handler(
+async function dartCorpCodeHandler(
   req: ApiRequest,
   res: ApiResponse,
 ): Promise<void> {
@@ -39,3 +40,5 @@ export default async function handler(
     sendError(res, 500, 'corpCode 조회에 실패했습니다.', String(error))
   }
 }
+
+export default withJsonHandler(dartCorpCodeHandler)
